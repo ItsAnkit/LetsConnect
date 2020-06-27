@@ -5,6 +5,7 @@
 
 ### Setup Cassandra
   > brew install ccm maven
+  
   > pip install cqlsh
   
 ### Create cassandra cluster
