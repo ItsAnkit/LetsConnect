@@ -1,6 +1,6 @@
 import Vue from 'vue'
 import Router from 'vue-router'
-import Chatroom from './components/Chatroom.vue'
+import Home from './components/Home.vue'
 import Login from './components/Login.vue'
 
 Vue.use(Router)
@@ -14,9 +14,9 @@ export default new Router({
       component: Login
     },
     {
-      path: '/chatroom',
-      name: 'Chatroom',
-      component: Chatroom
+      path: '/home',
+      name: 'Home',
+      component: Home
     }
   ]
 })
