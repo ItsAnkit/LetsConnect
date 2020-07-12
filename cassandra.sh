@@ -45,4 +45,12 @@ create table messages (
     created_at timestamp
 );" | cqlsh --cqlversion 3.4.2
 
+echo "
+use letsconnect;
+create table transient_messages (
+    id int primary key,
+    message_id int,
+    created_at timestamp
+)
+
 echo "Done !!!"

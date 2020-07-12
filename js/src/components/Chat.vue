@@ -47,10 +47,11 @@
       this.ws = new WebSocket(Config.WsHost + 'ws');
       this.ws.addEventListener('message', function(e) {
         var msg = JSON.parse(e.data);
+        console.log("por", msg)
         self.chatContent += '<div class="chip">'
                 + '<img src="' + self.gravatarURL(msg.username) + '">'
                 + self.currentUser + '</div>'
-                + msg.message
+                + msg.data
                 + '<br/>';
         var element = document.getElementById('chat-messages');
         element.scrollTop = element.scrollHeight; // Auto scroll to the bottom

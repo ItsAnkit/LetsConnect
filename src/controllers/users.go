@@ -41,7 +41,7 @@ func createUser(user User, Session *gocql.Session) (bool, User) {
 		}
 		return false, user
 	}
-	user.Id = totalUsers(Session) + 1
+	user.Id = lastUserId(Session) + 1
 	err := Session.Query("insert into users(id, mobile_no, username, created_at) VALUES(?, ?, ?, ?);", user.Id, user.MobileNo, user.Username, user.CreatedAt ).Exec()
 	if err != nil {
 		log.Println("\n Error Message: ", err)
@@ -63,11 +63,12 @@ func mobileExists(mobile_no string, Session *gocql.Session) bool {
 	return true
 }
 
-func totalUsers(Session *gocql.Session) int {
+func lastUserId(Session *gocql.Session) int {
 	var maxId int
 	err := Session.Query("select max(id) from users").Scan(&maxId)
 	if err != nil {
 		log.Println("Aggregation Error: ", err)
+		return -1
 	}
 	return maxId
 }

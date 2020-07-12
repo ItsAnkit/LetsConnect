@@ -88,12 +88,12 @@
       this.fetchChats();
       this.ws = new WebSocket(Config.WsHost + 'ws');
       this.ws.addEventListener('message', function(e) {
-        console.log("jkl", e)
         var msg = JSON.parse(e.data);
+        console.log("jkli", e, msg)
         self.chatContent += '<div class="chip">'
                 + '<img src="' + self.gravatarURL(msg.username) + '">'
                 + self.currentUser.username + '</div>'
-                + msg.message
+                + msg
                 + '<br/>';
         var element = document.getElementById('chat-messages');
         element.scrollTop = element.scrollHeight;

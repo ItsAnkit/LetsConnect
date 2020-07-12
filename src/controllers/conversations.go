@@ -1,8 +1,8 @@
 package controllers
 
 import (
-	"log"
 	"github.com/gocql/gocql"
+	"log"
 	"time"
 	"strconv"
 )
@@ -17,7 +17,7 @@ func createConversation(currentUserId string, friendMobileNo string, user User, 
 	var conv Conversation
 	var participants = make([] Participant, 0)
 	var success bool
-	conv = Conversation{totalConversations(Session) + 1, user.Id, time.Now()}
+	conv = Conversation{lastConversationId(Session) + 1, user.Id, time.Now()}
 	err := Session.Query("insert into conversations(id, creator_id, created_at) values(?, ? ,?)", conv.Id, conv.CreatorId, conv.CreatedAt).Exec()
 	if err != nil {
 		return false, conv, participants
@@ -64,7 +64,7 @@ func isFriend(mobile_no string, Session *gocql.Session, userId string) (bool) {
 	return false
 }
 
-func totalConversations(Session *gocql.Session) int {
+func lastConversationId(Session *gocql.Session) int {
 	var maxId int
 	err := Session.Query("select max(id) from conversations").Scan(&maxId)
 	if err != nil {
