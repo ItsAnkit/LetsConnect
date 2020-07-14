@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"log"
+	// "strconv"
 )
 
 type Hub struct {
@@ -23,6 +24,7 @@ func (hub *Hub) Run() {
 		select {
 			case client := <- hub.subscribe: //Receive data from subscribe channel
 				subscribeUser(hub, client)
+				log.Println("hub...", hub.subscribe)
 			case client := <- hub.unsubscribe: //Receive data from unsubscribe channel
 				unsubscribeUser(hub, client)
 		}
@@ -30,18 +32,20 @@ func (hub *Hub) Run() {
 }
 
 func subscribeUser(hub *Hub, client *Client) {
-	log.Println("sub1", hub.clients)
+	log.Println("sub1 ...........", hub.clients)
 	hub.clients[client] = true
-	log.Println("sub2", hub.clients)
+	log.Println("sub2 ...........", hub.clients)
 	socketEvent := SocketEvent{"message", client.messagePayload }
 	handleSocketPayloadEvent(client, socketEvent)
 }
 
 func unsubscribeUser(hub *Hub, client *Client) {
 	_, success := hub.clients[client]
+	log.Println("+++++++++++    unsubscribing    +++++++++++++")
 	if success {
+		// channelId := strconv.Itoa(client.messagePayload.SenderId) + strconv.Itoa(client.friendId)
 		// delete(hub.clients, client)
-		close(client.send)
+		// close(client.send[channelId])
 		// socketEvent := SocketEvent{"disconnect", client.userId}
 		// handleSocketPayloadEvent(client, socketEvent)
 	}

@@ -8,10 +8,11 @@ import (
 	// "github.com/google/uuid"
 	"encoding/json"
 	"bytes"
+	"strconv"
 )
 
 const (
-	writewait = 10 * time.Second
+	writewait = 100 * time.Second
 	pongWait = 60 * time.Second
 	pingPeriod = (pongWait * 9)/10
 	messageSize = 512
@@ -25,31 +26,37 @@ type SocketEvent struct {
 type Client struct {
 	hub *Hub
 	wsConnection *websocket.Conn
-	send chan string
+	send  map[string](chan string)
 	session *gocql.Session
 	messagePayload MessagePayload
+	friendId int
 }
 
 func CreateNewSocket(conn *websocket.Conn, hub *Hub, msg MessagePayload, Session *gocql.Session) {
 	// id := uuid.New()
+	success, friend := fetchOtherParticipant(Session, msg.ConversationId, msg.SenderId)
+	if !success {
+		return
+	}
 	client := &Client{
 		hub: hub,
 		wsConnection: conn,
-		send: make(chan string),
+		send: make(map[string](chan string)),
 		session: Session,
 		messagePayload: msg,
+		friendId: friend.Id,
 	}
 	log.Println("client", client, hub.clients)
-	go client.writeMessage()
 	go client.readMessage()
+	go client.writeMessage()
 	client.hub.subscribe <- client
 }
 
 func (client *Client) readMessage() {
 	var socketEvent SocketEvent
-	defer closeSocketConnection(client)
+	// defer closeSocketConnection(client)
 	// setWebSocketConfig(client)
-
+	log.Println("Reading Message ++++++++++++++++++++=")
 	for {
 		x, payload, wsErr := client.wsConnection.ReadMessage()
 
@@ -64,22 +71,24 @@ func (client *Client) readMessage() {
 			log.Println("Decoding error: ", err)
 			return
 		}
-		log.Println("read1 : ", socketEvent, decoder)
+		log.Println("read1 : ", socketEvent)
 		handleSocketPayloadEvent(client, socketEvent)
 	}
 }
 
 func (client *Client) writeMessage() {
 	ticker := time.NewTicker(pingPeriod)
+	log.Println("Writing Message ++++++++++++++++++++=")
 	defer func() {
 		ticker.Stop()
-		client.wsConnection.Close()
+		// client.wsConnection.Close()
 	}()
-	writeDeadline := time.Now().Add(writewait)
-	log.Println("Write: ", ticker)
+	// writeDeadline := time.Now().Add(writewait)
+	channelId :=  strconv.Itoa(client.friendId) + strconv.Itoa(client.messagePayload.SenderId) 
+	log.Println("Write: ", client.friendId, channelId, client.send, client.messagePayload.Message)
 	for {
 		select {
-			case payload, success := <- client.send:
+			case payload, success := <- client.send[channelId]:
 				requestBytes := new(bytes.Buffer)
 				json.NewEncoder(requestBytes).Encode(payload)
 				finalPayload := requestBytes.Bytes()
@@ -96,9 +105,9 @@ func (client *Client) writeMessage() {
 					return
 				}
 				writer.Write(finalPayload)
-				n := len(client.send)
+				n := len(client.send[channelId])
 				for i := 0; i < n; i++ {
-					json.NewEncoder(requestBytes).Encode(<-client.send)
+					json.NewEncoder(requestBytes).Encode(<-client.send[channelId])
 					writer.Write(requestBytes.Bytes())
 				}
 				log.Println("Write2: ", writer, n)
@@ -107,7 +116,7 @@ func (client *Client) writeMessage() {
 				}
 
 			case <-ticker.C: // Receiving from channel to which tickers are delivered.
-				client.wsConnection.SetWriteDeadline(writeDeadline)
+				// client.wsConnection.SetWriteDeadline(writeDeadline)
 				err := client.wsConnection.WriteMessage(websocket.PingMessage, nil)
 				log.Println("Write3: ", client, err)
 				if err != nil {
@@ -133,9 +142,9 @@ func setWebSocketConfig(client *Client) {
 }
 
 func handleSocketPayloadEvent(client *Client, socketEvent SocketEvent) {
+	log.Println("Socket Payload ++++++++++++++++++++")
 	switch socketEvent.EventName {
 		// case "join":
-
 		case "message":
 			messagePayload := socketEvent.EventPayload.(MessagePayload)
 			if true {
@@ -157,17 +166,21 @@ func handleSocketPayloadEvent(client *Client, socketEvent SocketEvent) {
 
 func SendToSpecificClient(client *Client, socketEvent SocketEvent, friendId int) {
 	hub := client.hub
-	log.Println("send_to", friendId, hub.clients)
 	messageSend := false
 	messagePayload := socketEvent.EventPayload.(MessagePayload)
+	channelId := strconv.Itoa(messagePayload.SenderId) + strconv.Itoa(client.friendId)
+	log.Println("send_to", client.friendId, channelId, client.send, client.messagePayload.Message)
 	for client := range hub.clients {
 		if client.messagePayload.SenderId == friendId {
-			log.Println("send_to found....", friendId, messagePayload.SenderId)
+			client.send[channelId] = make(chan string, 5) 
 			select {
-				case client.send <- messagePayload.Message:
+				case client.send[channelId] <- messagePayload.Message:
 					messageSend = true
+					log.Println("send_to found....", friendId, messagePayload.SenderId, channelId, client.send)
 				default:
-					close(client.send)
+					if channelId == "" {
+						close(client.send[channelId])
+					}
 					// delete(hub.clients, client)
 			}
 		}

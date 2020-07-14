@@ -1,0 +1,11 @@
+.vscode
+.DS_Store
+.gitignore
+
+sample.txt
+
+dsc.tar.gz
+js/node_modules/
+.main.gopry
+pkg/
+js/yarn.lock

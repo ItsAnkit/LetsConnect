@@ -117,7 +117,7 @@ func HandleMessage(hub *Hub, Session *gocql.Session) gin.HandlerFunc {
 
 func handleWebsocket(w http.ResponseWriter, req *http.Request, hub *Hub, Session *gocql.Session) {
 	ws, err := upgrader.Upgrade(w, req, nil)
-	log.Println("rrr", hub, "kkk")
+	log.Println("fun hub", hub, "hub")
 	if err != nil {
 		log.Fatal("Problem updating to sockets: ", err)
 	}
