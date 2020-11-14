@@ -22,23 +22,7 @@
       </div>
       <div class="card w-75 ml-2 mr-4">
         <div class="card-block" v-if="chats.length">
-          <div class="row min-vh-100">
-            <div id="chat-messages" class="card-content" >
-              <div class="text-left" v-html="chatContent">
-              </div>
-            </div>
-          </div>
-          <div class="row m-4">
-            <div class="input-field w-75 ml-4">
-              <input type="text" v-model="newMessage" @keyup.enter="send">
-            </div>
-            <div class="input-field col s4">
-              <button class="waves-effect waves-light btn" @click="send">
-                <i class="material-icons right">chat</i>
-                  Send
-              </button>
-            </div>
-          </div>
+          <Chat v-bind:currentChat="currentChat" :key="componentKey" ></Chat>
         </div>
         <div class="card-block min-vh-100" v-else>
           <h3 class="text-center">No chat History</h3>
@@ -50,25 +34,26 @@
 
 <script>
   import $ from 'jquery'
-  import MD5 from 'crypto-js/md5'
   import {Config} from "../config"
   import axios from 'axios'
   import M from 'materialize-css'
   import Telephony from './Telephony.vue'
+  import Chat from './Chat.vue'
   import 'materialize-css/dist/css/materialize.css'
 
   export default {
     name: 'Home',
     components: {
       Telephony,
+      Chat,
     },
     props: {
       msg: String
     },
     computed: {
-        currentUser: function() {
-          return this.$store.getters.getUser
-        },
+      currentUser: function() {
+        return this.$store.getters.getUser
+      },
     },
     data: function() {
       return  {
@@ -80,29 +65,31 @@
         searchContactPresent: false,
         chats: [],
         currentChat: '',
+        componentKey: 0,
       }
     },
 
     created: function() {
-      var self = this;
+      // var self = this;
       this.fetchChats();
-      this.ws = new WebSocket(Config.WsHost + 'ws');
-      this.ws.addEventListener('message', function(e) {
-        var msg = JSON.parse(e.data);
-        console.log("jkli", e, msg)
-        self.chatContent += '<div class="chip">'
-                + '<img src="' + self.gravatarURL(msg.username) + '">'
-                + self.currentUser.username + '</div>'
-                + msg
-                + '<br/>';
-        var element = document.getElementById('chat-messages');
-        element.scrollTop = element.scrollHeight;
-      });
+      // this.ws = new WebSocket(Config.WsHost + 'ws');
+      // this.ws.addEventListener('message', function(e) {
+      //   var msg = JSON.parse(e.data);
+      //   self.chatContent += self.appendChat(msg, self.currentChat.friend)
+      //   var element = document.getElementById('chat-messages');
+      //   element.scrollTop = element.scrollHeight;
+      // });
+    },
+
+    mounted: function() {
+      if (this.$refs.contact != undefined)
+        this.$refs.contact[this.selectedChat].style.background  = "#DFEEE9"
     },
 
     methods: {
       setChat: function(index) {
         this.currentChat = this.chats[index]
+        this.componentKey += 1
       },
 
       fetchChats: function() {
@@ -119,23 +106,22 @@
         })
       },
 
-      send: function () {
-        // debugger // eslint-disable-line
-        if (this.newMessage != '') {
-          this.ws.send(
-            JSON.stringify({
-              conversation_id: this.currentChat.conversation.id,
-              sender_id: this.currentUser.id,
-              message: $('<p>').html(this.newMessage).text()
-            }
-          ));
-          this.newMessage = '';
-        }
-      },
-
-      gravatarURL: function(email) {
-        return 'http://www.gravatar.com/avatar/' + MD5(email);
-      },
+      // send: function () {        
+      //   //var endPoint = `/conversation/${self.currentChat.conversation.id}/user/${self.currentChat.id}/ping`
+      //   //debugger // eslint-disable-line
+      //   let message = $('<p>').html(this.newMessage).text()
+      //   if (this.newMessage != '') {
+      //     this.ws.send(
+      //       JSON.stringify({
+      //         conversation_id: this.currentChat.conversation.id,
+      //         sender_id: this.currentUser.id,
+      //         message: message
+      //       }
+      //     ));
+      //     this.chatContent += this.appendChat(message, this.currentUser)
+      //     this.newMessage = '';
+      //   }
+      // },
 
       search: function() {
         let self = this;

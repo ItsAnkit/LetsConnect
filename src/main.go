@@ -23,5 +23,6 @@ func main() {
 	router.POST("/conversations/:id/add", controllers.AddContact(Session))
 
 	router.GET("/ws", controllers.HandleMessage(hub, Session))
+	// router.GET("/ws/users/:id/conversations/:conv_id/ping", controllers.HandleMessage(hub, Session))
 	router.Run(":8050")
 }

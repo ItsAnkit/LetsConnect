@@ -26,53 +26,55 @@ type SocketEvent struct {
 type Client struct {
 	hub *Hub
 	wsConnection *websocket.Conn
-	send  map[string](chan string)
+	// send  map[string](chan string)
 	session *gocql.Session
 	messagePayload MessagePayload
 	friendId int
 }
 
-func CreateNewSocket(conn *websocket.Conn, hub *Hub, msg MessagePayload, Session *gocql.Session) {
+func CreateNewSocket(conn *websocket.Conn, hub *Hub, Session *gocql.Session, messagePayload MessagePayload) {
 	// id := uuid.New()
-	success, friend := fetchOtherParticipant(Session, msg.ConversationId, msg.SenderId)
+	success, friend := fetchOtherParticipant(Session, messagePayload.ConversationId, messagePayload.SenderId)
 	if !success {
 		return
 	}
 	client := &Client{
 		hub: hub,
 		wsConnection: conn,
-		send: make(map[string](chan string)),
 		session: Session,
-		messagePayload: msg,
+		messagePayload: messagePayload,
 		friendId: friend.Id,
 	}
 	log.Println("client", client, hub.clients)
-	go client.readMessage()
+	if !client.hub.clients[client] {
+		log.Println("subscribing!!!")
+		client.hub.subscribe <- client
+	}
 	go client.writeMessage()
-	client.hub.subscribe <- client
+	go client.readMessage()
 }
 
 func (client *Client) readMessage() {
-	var socketEvent SocketEvent
 	// defer closeSocketConnection(client)
 	// setWebSocketConfig(client)
-	log.Println("Reading Message ++++++++++++++++++++=")
+	log.Println("Reading Message ++++++++++++++++++++", client.wsConnection, "\n likerer", client.messagePayload )
 	for {
+		log.Println("reading started...")
 		x, payload, wsErr := client.wsConnection.ReadMessage()
-
+		log.Println("Payload +++ ", payload)
 		if wsErr != nil {
-			log.Println("Socket Read Error: ", wsErr, payload, x)
+			log.Println("Socket Read Error: ", wsErr, x)
 			return
 		}
 		decoder := json.NewDecoder(bytes.NewReader(payload))
-		err := decoder.Decode(&socketEvent)
-
+		err := decoder.Decode(&client.messagePayload)
+		log.Println("decoder ", decoder, "payload ", payload)
 		if err != nil {
 			log.Println("Decoding error: ", err)
 			return
 		}
-		log.Println("read1 : ", socketEvent)
-		handleSocketPayloadEvent(client, socketEvent)
+		log.Println("read1 : ", client.messagePayload)
+		handleSocketPayloadEvent(client)
 	}
 }
 
@@ -84,11 +86,11 @@ func (client *Client) writeMessage() {
 		// client.wsConnection.Close()
 	}()
 	// writeDeadline := time.Now().Add(writewait)
-	channelId :=  strconv.Itoa(client.friendId) + strconv.Itoa(client.messagePayload.SenderId) 
-	log.Println("Write: ", client.friendId, channelId, client.send, client.messagePayload.Message)
+	channelId :=  strconv.Itoa(client.friendId) + "-" + strconv.Itoa(client.messagePayload.SenderId) 
+	log.Println("Write: ", client.friendId, channelId, client.hub.send, client.messagePayload.Message)
 	for {
 		select {
-			case payload, success := <- client.send[channelId]:
+			case payload, success := <- client.hub.send[channelId]:
 				requestBytes := new(bytes.Buffer)
 				json.NewEncoder(requestBytes).Encode(payload)
 				finalPayload := requestBytes.Bytes()
@@ -105,9 +107,9 @@ func (client *Client) writeMessage() {
 					return
 				}
 				writer.Write(finalPayload)
-				n := len(client.send[channelId])
+				n := len(client.hub.send[channelId])
 				for i := 0; i < n; i++ {
-					json.NewEncoder(requestBytes).Encode(<-client.send[channelId])
+					json.NewEncoder(requestBytes).Encode(<-client.hub.send[channelId])
 					writer.Write(requestBytes.Bytes())
 				}
 				log.Println("Write2: ", writer, n)
@@ -141,45 +143,39 @@ func setWebSocketConfig(client *Client) {
 	})
 }
 
-func handleSocketPayloadEvent(client *Client, socketEvent SocketEvent) {
-	log.Println("Socket Payload ++++++++++++++++++++")
-	switch socketEvent.EventName {
-		// case "join":
-		case "message":
-			messagePayload := socketEvent.EventPayload.(MessagePayload)
-			if true {
-				id := lastMessageId(client.session) + 1
-				// messagePayload := MessagePayload{id, conversationId, time.Now(), message, senderId}
-				messagePayload.Id = id
-				success := insertMessage(client.session, messagePayload)
-				log.Println("Private Chat1 ", socketEvent.EventPayload, success)
-				if success {
-					messagePacket := SocketEvent{"message", messagePayload}
-					success, friend := fetchOtherParticipant(client.session, messagePayload.ConversationId, messagePayload.SenderId)
-					if success {
-						SendToSpecificClient(client, messagePacket, friend.Id)
-					}
-				}
-			}
+func handleSocketPayloadEvent(client *Client) {
+	log.Println("handleSocketPayloadEvent ++++++++++++++++++++")
+	id := lastMessageId(client.session) + 1
+	// messagePayload := MessagePayload{id, conversationId, time.Now(), message, senderId}
+	// messagePayload := client.messagePayload
+	client.messagePayload.Id = id
+	success := insertMessage(client.session, client.messagePayload)
+	log.Println("Private Chat1 ", client.messagePayload, success)
+	if success {
+		// messagePacket := SocketEvent{"message", messagePayload}
+		success, friend := fetchOtherParticipant(client.session, client.messagePayload.ConversationId, client.messagePayload.SenderId)
+		if success {
+			SendToSpecificClient(client, client.messagePayload, friend.Id)
+		}
 	}
 }
 
-func SendToSpecificClient(client *Client, socketEvent SocketEvent, friendId int) {
+func SendToSpecificClient(client *Client, messagePayload MessagePayload, friendId int) {
 	hub := client.hub
 	messageSend := false
-	messagePayload := socketEvent.EventPayload.(MessagePayload)
-	channelId := strconv.Itoa(messagePayload.SenderId) + strconv.Itoa(client.friendId)
-	log.Println("send_to", client.friendId, channelId, client.send, client.messagePayload.Message)
+	// messagePayload := socketEvent.EventPayload.(MessagePayload)
+	channelId := strconv.Itoa(messagePayload.SenderId) + "-" + strconv.Itoa(friendId)
+	log.Println("send_to", client.friendId, channelId, hub.send, messagePayload.Message)
 	for client := range hub.clients {
-		if client.messagePayload.SenderId == friendId {
-			client.send[channelId] = make(chan string, 5) 
+		if (client.messagePayload.SenderId == friendId && len(client.messagePayload.Message) > 0) {
+			hub.send[channelId] = make(chan string, 10) 
 			select {
-				case client.send[channelId] <- messagePayload.Message:
+				case hub.send[channelId] <- messagePayload.Message:
 					messageSend = true
-					log.Println("send_to found....", friendId, messagePayload.SenderId, channelId, client.send)
+					log.Println("send_to found....", friendId, messagePayload.SenderId, channelId, hub.send)
 				default:
 					if channelId == "" {
-						close(client.send[channelId])
+						close(hub.send[channelId])
 					}
 					// delete(hub.clients, client)
 			}

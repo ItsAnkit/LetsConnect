@@ -8,6 +8,7 @@ import (
 	"github.com/gorilla/websocket"
 	"net/http"
 	"github.com/gocql/gocql"
+	// "strconv"
 )
 
 // CheckOrigin returns true if the request from different origin is allowed or not,
@@ -110,12 +111,19 @@ func AddContact(Session *gocql.Session) gin.HandlerFunc {
 
 func HandleMessage(hub *Hub, Session *gocql.Session) gin.HandlerFunc {
 	fn := func(c *gin.Context) {
-		handleWebsocket(c.Writer, c.Request, hub, Session)
+		// senderId, u_err := strconv.Atoi(c.Param("id"))
+		// conversationId, c_err := strconv.Atoi(c.Param("conv_id"))
+		// if u_err != nil || c_err != nil {
+		// 	log.Println("conversion error: ", u_err, c_err)
+		// }
+		// messagePayload := MessagePayload{ ConversationId: conversationId, SenderId: senderId }
+		var messagePayload MessagePayload
+		handleWebsocket(c.Writer, c.Request, hub, Session, messagePayload)
 	}
 	return gin.HandlerFunc(fn)
 }
 
-func handleWebsocket(w http.ResponseWriter, req *http.Request, hub *Hub, Session *gocql.Session) {
+func handleWebsocket(w http.ResponseWriter, req *http.Request, hub *Hub, Session *gocql.Session, messagePayload MessagePayload) {
 	ws, err := upgrader.Upgrade(w, req, nil)
 	log.Println("fun hub", hub, "hub")
 	if err != nil {
@@ -126,8 +134,8 @@ func handleWebsocket(w http.ResponseWriter, req *http.Request, hub *Hub, Session
 	if err != nil {
 		log.Println("Error fetching params: ", err)
 	}
-	log.Println("eee", msg, err)
-	CreateNewSocket(ws, hub, msg, Session)
+	log.Println("mp", messagePayload)
+	CreateNewSocket(ws, hub, Session, msg)
 }
 
 // Channels are the pipes that connect goroutines.

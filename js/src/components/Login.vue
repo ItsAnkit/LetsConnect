@@ -38,9 +38,17 @@
             }
         },
 
+        created: function() {
+            // var self = this;
+            //var endPoint = `ws/users/${self.currentUser.id}/conversations/${self.currentChat.conversation.id}/ping`
+            // this.ws = new WebSocket(Config.WsHost + 'ws');
+            // this.ws.addEventListener('message', function(e) {
+            //     console.log("login", e)
+            // });
+        },
+
         methods: {
             join: function() {
-                // debugger // eslint-disable-line
                 if (!this.mobile_no) {
                     M.toast({ html: 'You must provide a Mobile No.', classes: 'black',  displayLength: 2000} );
                     return
@@ -61,6 +69,7 @@
                 .then(response => {
                     if (response.data.success) {
                         self.$store.commit("updateUser", response.data.user)
+                        // self.initiateSocket(response.data.user)
                         this.$router.push({ name: 'Home'})
                         // window.location.href will cause a full page load and won't work here as Vuex state is stored in memory
                         // and we will lose this state on such page load.       
@@ -77,10 +86,20 @@
             },
             userDetails: function() {
                 return JSON.stringify({ 
-                                            "mobile_no": this.mobile_no,
-                                            "username": this.username,
+                                        "mobile_no": this.mobile_no,
+                                        "username": this.username,
                                       });
-            }
+            },
+
+            // initiateSocket: function(user) {
+            //     this.ws.send(
+            //         JSON.stringify({
+            //             conversation_id: 0,
+            //             sender_id: user.id,
+            //             message: '',
+            //         })
+            //     )
+            // },
         }
     }
 </script>
